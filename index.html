@@ -162,6 +162,10 @@
     .pdot.pass{background:rgba(72,199,142,.18);color:var(--green);}
     .pdot.fail{background:rgba(239,68,68,.18);color:var(--red);}
     .pdot.na{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+    .ptag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:600;white-space:nowrap;margin:2px 2px 2px 0;}
+    .ptag.pass{background:rgba(72,199,142,.15);color:var(--green);}
+    .ptag.fail{background:rgba(239,68,68,.18);color:var(--red);}
+    .ptag.na{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
     .improve-list{display:flex;gap:5px;flex-wrap:wrap;}
     .improve-tag{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:2px 8px;font-size:.74rem;font-weight:600;white-space:nowrap;}
     .section-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;}
@@ -259,10 +263,19 @@
       <div class="table-card">
         <div class="table-head"><h3>Review History</h3></div>
         <table>
-          <thead><tr><th>Date</th><th>Score</th><th>Reviewer</th><th>Remarks</th></tr></thead>
+          <thead><tr><th>Date</th><th>Score</th><th>Remarks</th></tr></thead>
           <tbody id="review-body"></tbody>
         </table>
       </div>
+      <!-- MARKDOWN TRACKER — AGENT -->
+      <div class="table-card" id="agent-tracker-section" style="margin-top:14px;">
+        <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('agent-tracker')">
+          <h3 class="section-toggle" id="agent-tracker-toggle">My Markdown Tracker</h3>
+          <span style="font-size:.78rem;color:var(--muted);">Failures per category this period · click to collapse</span>
+        </div>
+        <div id="agent-tracker-body" class="tracker-wrap"></div>
+      </div>
+
       <!-- DETAILED REVIEW LIST — AGENT -->
       <div class="table-card" id="agent-detail-section" style="margin-top:14px;">
         <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('agent')">
@@ -355,6 +368,33 @@ const CATS = [
   { col:14, short:'Tracker Updates',  group:'Policy' },
   { col:15, short:'Notes Recorded',   group:'Policy' },
 ];
+
+// Keyword map for detecting category failures in Remarks text
+const CAT_KEYWORDS = {
+  6:  ['acknowledgment'],
+  7:  ['reassurance'],
+  8:  ['empathy'],
+  9:  ['topic application'],
+  10: ['account review'],
+  11: ['sop adherence', 'sop', 'proper response'],
+  12: ['escalation'],
+  13: ['brand voice'],
+  14: ['tracker update'],
+  15: ['notes recorded'],
+};
+
+// Parse which categories failed based on remarks text + score
+function parseCatsFromRemarks(remarks, score){
+  const sc  = parseFloat(score);
+  const rem = (remarks||'').toLowerCase();
+  const res = {};
+  CATS.forEach(c=>{
+    const kws = CAT_KEYWORDS[c.col] || [c.short.toLowerCase()];
+    const failed = kws.some(kw => rem.includes(kw));
+    res[c.col] = failed ? 'no' : (sc===100 ? 'yes' : 'na');
+  });
+  return res;
+}
 
 // Agent avatar colors
 const AV_COLORS = {
@@ -491,9 +531,10 @@ function agentStats(rows){
     const sc = parseFloat(r[COL.SCORE]);
     if(!isNaN(sc)) map[name].scores.push(sc);
     map[name].total++;
+    const catRes = parseCatsFromRemarks(r[COL.REMARKS], r[COL.SCORE]);
     CATS.forEach(c=>{
-      const v = (r[c.col]||'').trim().toLowerCase();
       if(!map[name].cats[c.col]) map[name].cats[c.col] = {yes:0,no:0,na:0};
+      const v = catRes[c.col];
       if(v==='yes') map[name].cats[c.col].yes++;
       else if(v==='no') map[name].cats[c.col].no++;
       else map[name].cats[c.col].na++;
@@ -556,26 +597,24 @@ function renderDetailedList(rows, agentFilter, targetId){
       const d  = parseTs(r[COL.TIMESTAMP]);
       const dateStr = d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
 
-      const paramsHtml = CATS.map(c=>{
-        const v = (r[c.col]||'').trim().toLowerCase();
-        const cls = v==='yes'?'pass':v==='no'?'fail':'na';
-        const lbl = v==='yes'?'✓':v==='no'?'✗':'—';
-        return `<span class="pdot ${cls}" title="${c.short}: ${v||'N/A'}">${lbl}</span>`;
-      }).join('');
+      const catRes   = parseCatsFromRemarks(r[COL.REMARKS], r[COL.SCORE]);
+      const failed   = CATS.filter(c=>catRes[c.col]==='no');
+      const paramsHtml = failed.length
+        ? failed.map(c=>`<span class="ptag fail">${c.short}</span>`).join('')
+        : `<span class="ptag pass">All Pass ✓</span>`;
 
-      const improve = CATS.filter(c=>(r[c.col]||'').trim().toLowerCase()==='no').map(c=>c.short);
-      const improveHtml = improve.length
-        ? improve.map(s=>`<span class="improve-tag">${s}</span>`).join('')
+      const improveHtml = failed.length
+        ? failed.map(c=>`<span class="improve-tag">${c.short}</span>`).join('')
         : `<span style="color:var(--muted);font-size:.78rem;">None ✓</span>`;
 
-      const rem  = (r[COL.REMARKS]||'').slice(0,80);
+      const rem  = (r[COL.REMARKS]||'');
 
       return `<tr>
         <td style="white-space:nowrap;font-size:.83rem;">${dateStr}</td>
         <td><span class="pill ${pillClass(sc)}">${isNaN(sc)?'—':sc+'%'}</span></td>
         <td><div class="param-dots">${paramsHtml}</div></td>
         <td><div class="improve-list">${improveHtml}</div></td>
-        <td style="color:var(--muted);font-size:.79rem;max-width:200px;">${rem}${rem.length===80?'…':''}</td>
+        <td style="color:var(--muted);font-size:.79rem;min-width:180px;">${rem}</td>
       </tr>`;
     }).join('');
 
@@ -592,11 +631,11 @@ function renderDetailedList(rows, agentFilter, targetId){
     html += `<div class="detail-agent-block">
       ${agentHeader}
       <div style="overflow-x:auto;">
-        <table style="width:100%;min-width:680px;">
+        <table style="width:100%;min-width:900px;">
           <thead>
             <tr>
               <th>Date</th><th>Score</th>
-              <th title="${CATS.map(c=>c.short).join(' · ')}">Parameters (hover for name)</th>
+              <th>Parameters</th>
               <th>Areas to Improve</th><th>Remarks</th>
             </tr>
           </thead>
@@ -615,8 +654,10 @@ function renderDetailedList(rows, agentFilter, targetId){
 }
 
 // ── MARKDOWN TRACKER ──
-function renderMarkdownTracker(stats, rows){
-  const el = document.getElementById('tracker-body');
+function renderMarkdownTracker(stats, rows, targetId, agentFilter){
+  targetId = targetId || 'tracker-body';
+  const el = document.getElementById(targetId);
+  if(!el) return;
   if(!stats.length){ el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;">No data.</div>'; return; }
 
   // Period header
@@ -628,7 +669,10 @@ function renderMarkdownTracker(stats, rows){
   CATS.forEach(c=>{ colTotals[c.col]=0; });
 
   // Build rows
-  const bodyRows = ALLOWED_AGENTS.map(name=>{
+  const agentsToRender = agentFilter
+    ? ALLOWED_AGENTS.filter(a=>a.toLowerCase()===agentFilter.toLowerCase())
+    : ALLOWED_AGENTS;
+  const bodyRows = agentsToRender.map(name=>{
     const s = stats.find(x=>x.name.toLowerCase()===name.toLowerCase());
     if(!s) return `<tr>
       <td class="td-agent"><div class="agent-chip"><div class="av" style="background:${avColor(name)};width:26px;height:26px;font-size:.65rem;">${initials(name)}</div>${name}</div></td>
@@ -689,9 +733,10 @@ function renderMarkdownTracker(stats, rows){
 // ── COLLAPSIBLE SECTIONS ──
 function toggleDetailSection(which){
   const map = {
-    team:    {body:'team-detail-body',   tog:'team-detail-toggle'},
-    agent:   {body:'agent-detail-body',  tog:'agent-detail-toggle'},
-    tracker: {body:'tracker-body',       tog:'tracker-toggle'},
+    team:            {body:'team-detail-body',    tog:'team-detail-toggle'},
+    agent:           {body:'agent-detail-body',   tog:'agent-detail-toggle'},
+    tracker:         {body:'tracker-body',         tog:'tracker-toggle'},
+    'agent-tracker': {body:'agent-tracker-body',  tog:'agent-tracker-toggle'},
   };
   const {body:bodyId, tog:togId} = map[which]||{};
   if(!bodyId) return;
@@ -847,6 +892,9 @@ function renderAgentPanel(agentName){
               y:{grid:{display:false},ticks:{color:'#8892a4',font:{size:11}}}}}
   });
 
+  // Agent markdown tracker
+  renderMarkdownTracker(agentStats(rows), rows, 'agent-tracker-body', agentName);
+
   // Detailed parameter list for agent panel
   renderDetailedList(rows, agentName, 'agent-detail-body');
 
@@ -861,8 +909,7 @@ function renderAgentPanel(agentName){
     return `<tr>
       <td>${dateStr}</td>
       <td><span class="pill ${cls}">${isNaN(sc2)?'—':sc2+'%'}</span></td>
-      <td>${r[COL.REVIEWER]||'—'}</td>
-      <td style="color:var(--muted);font-size:.82rem;max-width:300px;">${rem.slice(0,120)}${rem.length>120?'…':''}</td>
+      <td style="color:var(--muted);font-size:.82rem;min-width:200px;">${rem}</td>
     </tr>`;
   }).join('');
 
