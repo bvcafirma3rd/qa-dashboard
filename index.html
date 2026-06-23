@@ -133,6 +133,23 @@
     /* LINK */
     a{color:var(--blue);text-decoration:none;}
     a:hover{text-decoration:underline;}
+
+    /* DETAILED REVIEW LIST */
+    .detail-agent-block{border-bottom:1px solid var(--border);}
+    .detail-agent-block:last-child{border-bottom:none;}
+    .detail-agent-header{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
+    .detail-agent-header h4{font-size:.88rem;font-weight:700;display:flex;align-items:center;gap:9px;}
+    .detail-footer{padding:12px 18px;background:var(--surface2);border-top:2px solid var(--border);display:flex;justify-content:flex-end;gap:28px;font-size:.83rem;}
+    .param-dots{display:flex;gap:3px;flex-wrap:wrap;align-items:center;}
+    .pdot{width:22px;height:22px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;cursor:default;position:relative;}
+    .pdot.pass{background:rgba(72,199,142,.18);color:var(--green);}
+    .pdot.fail{background:rgba(239,68,68,.18);color:var(--red);}
+    .pdot.na{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+    .improve-list{display:flex;gap:5px;flex-wrap:wrap;}
+    .improve-tag{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25);border-radius:4px;padding:2px 8px;font-size:.74rem;font-weight:600;white-space:nowrap;}
+    .section-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;}
+    .section-toggle::after{content:'▲';font-size:.7rem;color:var(--muted);transition:transform .2s;}
+    .section-toggle.collapsed::after{transform:rotate(180deg);}
   </style>
 </head>
 <body>
@@ -192,6 +209,14 @@
         <div class="table-head"><h3>Leaderboard</h3><span id="period-badge" style="font-size:.78rem;color:var(--muted);"></span></div>
         <table><thead><tr id="lb-head"></tr></thead><tbody id="lb-body"></tbody></table>
       </div>
+      <!-- DETAILED REVIEW LIST — TEAM -->
+      <div class="table-card" id="team-detail-section" style="margin-top:14px;">
+        <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('team')">
+          <h3 class="section-toggle" id="team-detail-toggle">QA Reviews — Parameter Detail</h3>
+          <span style="font-size:.78rem;color:var(--muted);">Per review · all agents · click to collapse</span>
+        </div>
+        <div id="team-detail-body"></div>
+      </div>
     </div>
   </div>
 
@@ -212,6 +237,14 @@
           <thead><tr><th>Date</th><th>Score</th><th>Reviewer</th><th>Remarks</th><th>Conversation</th></tr></thead>
           <tbody id="review-body"></tbody>
         </table>
+      </div>
+      <!-- DETAILED REVIEW LIST — AGENT -->
+      <div class="table-card" id="agent-detail-section" style="margin-top:14px;">
+        <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('agent')">
+          <h3 class="section-toggle" id="agent-detail-toggle">Parameter Detail &amp; Areas to Improve</h3>
+          <span style="font-size:.78rem;color:var(--muted);">Per review breakdown · click to collapse</span>
+        </div>
+        <div id="agent-detail-body"></div>
       </div>
     </div>
   </div>
@@ -464,6 +497,7 @@ function renderAll(){
   renderLeaderboard(stats);
   renderBarChart(stats);
   renderDonutChart(stats);
+  renderDetailedList(rows, '', 'team-detail-body');
   updatePeriodBadge();
   if(document.getElementById('panel-agent').classList.contains('on')){
     renderAgentPanel(activeAgent);
@@ -471,6 +505,100 @@ function renderAll(){
   if(document.getElementById('panel-admin').classList.contains('on')){
     renderAdmin();
   }
+}
+
+// ── DETAILED REVIEW LIST ──
+function scoreColor(v){ return v>=90?'var(--green)':v>=75?'var(--yellow)':'var(--red)'; }
+
+function renderDetailedList(rows, agentFilter, targetId){
+  const agents = agentFilter
+    ? ALLOWED_AGENTS.filter(a=>a.toLowerCase()===agentFilter.toLowerCase())
+    : ALLOWED_AGENTS;
+
+  let html = '';
+  agents.forEach(agentName=>{
+    const agentRows = rows.filter(r=>(r[COL.AGENT]||'').trim().toLowerCase()===agentName.toLowerCase());
+    if(!agentRows.length) return;
+
+    const scores = agentRows.map(r=>parseFloat(r[COL.SCORE])).filter(n=>!isNaN(n));
+    const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : null;
+
+    const sorted = [...agentRows].sort((a,b)=>new Date(b[COL.TIMESTAMP])-new Date(a[COL.TIMESTAMP]));
+
+    const rowsHtml = sorted.map(r=>{
+      const sc = parseFloat(r[COL.SCORE]);
+      const d  = parseTs(r[COL.TIMESTAMP]);
+      const dateStr = d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
+
+      const paramsHtml = CATS.map(c=>{
+        const v = (r[c.col]||'').trim().toLowerCase();
+        const cls = v==='yes'?'pass':v==='no'?'fail':'na';
+        const lbl = v==='yes'?'✓':v==='no'?'✗':'—';
+        return `<span class="pdot ${cls}" title="${c.short}: ${v||'N/A'}">${lbl}</span>`;
+      }).join('');
+
+      const improve = CATS.filter(c=>(r[c.col]||'').trim().toLowerCase()==='no').map(c=>c.short);
+      const improveHtml = improve.length
+        ? improve.map(s=>`<span class="improve-tag">${s}</span>`).join('')
+        : `<span style="color:var(--muted);font-size:.78rem;">None ✓</span>`;
+
+      const link = r[COL.LINK]?`<a href="${r[COL.LINK]}" target="_blank" rel="noopener">↗</a>`:'';
+      const rem  = (r[COL.REMARKS]||'').slice(0,80);
+
+      return `<tr>
+        <td style="white-space:nowrap;font-size:.83rem;">${dateStr}</td>
+        <td><span class="pill ${pillClass(sc)}">${isNaN(sc)?'—':sc+'%'}</span></td>
+        <td><div class="param-dots">${paramsHtml}</div></td>
+        <td><div class="improve-list">${improveHtml}</div></td>
+        <td style="color:var(--muted);font-size:.79rem;max-width:200px;">${rem}${rem.length===80?'…':''}</td>
+        <td style="text-align:center;">${link}</td>
+      </tr>`;
+    }).join('');
+
+    // Per-agent block (hidden if agentFilter set, so no double agent header on agent panel)
+    const agentHeader = agentFilter ? '' : `
+      <div class="detail-agent-header">
+        <h4>
+          <div class="av" style="background:${avColor(agentName)};width:26px;height:26px;font-size:.65rem;flex-shrink:0;">${initials(agentName)}</div>
+          ${agentName}
+        </h4>
+        <span style="color:var(--muted);font-size:.82rem;">${agentRows.length} review${agentRows.length!==1?'s':''} this period</span>
+      </div>`;
+
+    html += `<div class="detail-agent-block">
+      ${agentHeader}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;min-width:680px;">
+          <thead>
+            <tr>
+              <th>Date</th><th>Score</th>
+              <th title="${CATS.map(c=>c.short).join(' · ')}">Parameters (hover for name)</th>
+              <th>Areas to Improve</th><th>Remarks</th><th>Link</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div class="detail-footer">
+        <span style="color:var(--muted);">Reviews: <strong style="color:var(--text);">${agentRows.length}</strong></span>
+        <span style="color:var(--muted);">Avg Score: <strong style="color:${avg?scoreColor(parseFloat(avg)):'var(--muted)'};">${avg!==null?avg+'%':'N/A'}</strong></span>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById(targetId).innerHTML = html ||
+    `<div style="padding:20px;color:var(--muted);text-align:center;">No reviews found for this period.</div>`;
+}
+
+// ── COLLAPSIBLE SECTIONS ──
+function toggleDetailSection(which){
+  const bodyId  = which==='team' ? 'team-detail-body'  : 'agent-detail-body';
+  const togId   = which==='team' ? 'team-detail-toggle' : 'agent-detail-toggle';
+  const body    = document.getElementById(bodyId);
+  const toggle  = document.getElementById(togId);
+  const hidden  = body.style.display === 'none';
+  body.style.display = hidden ? 'block' : 'none';
+  toggle.classList.toggle('collapsed', !hidden);
 }
 
 // ── KPI CARDS ──
@@ -617,6 +745,9 @@ function renderAgentPanel(agentName){
       scales:{x:{min:0,max:100,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4',callback:v=>v+'%'}},
               y:{grid:{display:false},ticks:{color:'#8892a4',font:{size:11}}}}}
   });
+
+  // Detailed parameter list for agent panel
+  renderDetailedList(rows, agentName, 'agent-detail-body');
 
   // Review history
   const body = document.getElementById('review-body');
