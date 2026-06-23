@@ -39,8 +39,7 @@
     /* CONTROLS */
     .controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--border);}
     .ctrl-label{font-size:.8rem;color:var(--muted);}
-    .month-label{cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);transition:all .15s;user-select:none;}
-    .month-label:hover{color:var(--text);border-color:var(--accent);}
+    #month-pick{min-width:130px;}
     .toggle-group{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
     .tog{padding:6px 16px;font-size:.82rem;font-weight:600;border:none;background:none;color:var(--muted);cursor:pointer;transition:all .15s;}
     .tog.on{background:var(--accent);color:#fff;}
@@ -181,8 +180,7 @@
     <button class="tog on" id="tog-mtd" onclick="setPeriod('mtd')">Month to Date</button>
     <button class="tog" id="tog-full" onclick="setPeriod('full')">Full Month</button>
   </div>
-  <label for="month-pick" class="ctrl-label month-label" title="Click to change month">Month</label>
-  <input type="month" id="month-pick" onchange="onMonthChange()"/>
+  <select id="month-pick" onchange="onMonthChange()"></select>
   <div class="spacer"></div>
   <select id="agent-sel" style="display:none" onchange="onAgentSel()">
     <option value="">— Select Agent —</option>
@@ -822,7 +820,19 @@ function onMonthChange(){
 function initMonth(){
   const now = new Date();
   selMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  document.getElementById('month-pick').value = selMonth;
+  const sel = document.getElementById('month-pick');
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  // Build options from MIN_YEAR Jan → current month
+  const opts = [];
+  for(let y = MIN_YEAR; y <= now.getFullYear(); y++){
+    const maxM = (y === now.getFullYear()) ? now.getMonth()+1 : 12;
+    for(let m = 1; m <= maxM; m++){
+      const val = `${y}-${String(m).padStart(2,'0')}`;
+      opts.push(`<option value="${val}">${MONTH_NAMES[m-1]} ${y}</option>`);
+    }
+  }
+  sel.innerHTML = opts.join('');
+  sel.value = selMonth;
 }
 
 function periodLabel(){
