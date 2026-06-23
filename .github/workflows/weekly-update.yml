@@ -2,28 +2,28 @@ name: Weekly QA Sync
 
 on:
   schedule:
-      - cron: '0 0 * * 6'
-        workflow_dispatch:
+    - cron: '0 0 * * 6'
+  workflow_dispatch:
 
-        permissions:
-          contents: write
+permissions:
+  contents: write
 
-          jobs:
-            update-timestamp:
-                runs-on: ubuntu-latest
-                    steps:
-                          - name: Checkout repo
-                                  uses: actions/checkout@v4
+jobs:
+  update-timestamp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-                                        - name: Write last-updated file
-                                                run: |
-                                                          mkdir -p data
-                                                                    echo "{\"last_updated\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"day\": \"$(date -u +'%A, %B %d %Y')\"}" > data/last_updated.json
+      - name: Write last-updated file
+        run: |
+          mkdir -p data
+          echo "{\"last_updated\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"day\": \"$(date -u +'%A, %B %d %Y')\"}" > data/last_updated.json
 
-                                                                          - name: Commit and push
-                                                                                  run: |
-                                                                                            git config user.name  "GitHub Actions"
-                                                                                                      git config user.email "actions@github.com"
-                                                                                                                git add data/last_updated.json
-                                                                                                                          git diff --staged --quiet || git commit -m "chore: weekly QA sync $(date -u +%Y-%m-%d)"
-                                                                                                                                    git push
+      - name: Commit and push
+        run: |
+          git config user.name  "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add data/last_updated.json
+          git diff --staged --quiet || git commit -m "chore: weekly QA sync $(date -u +%Y-%m-%d)"
+          git push
