@@ -1,1 +1,798 @@
-placeholder
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Path Social – Agent QA Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#0f1117;--surface:#1a1d27;--surface2:#21253a;--border:#2d3154;
+      --accent:#6c63ff;--green:#48c78e;--yellow:#f59e0b;--red:#ef4444;--blue:#38bdf8;
+      --text:#e2e8f0;--muted:#8892a4;--radius:12px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
+
+    /* HEADER */
+    header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+    .logo{display:flex;align-items:center;gap:12px;}
+    .logo-icon{width:36px;height:36px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.1rem;color:#fff;flex-shrink:0;}
+    .logo-name{font-weight:800;font-size:1.05rem;letter-spacing:-.01em;}
+    .logo-sub{color:var(--muted);font-size:.78rem;margin-top:1px;}
+    .header-right{display:flex;align-items:center;gap:10px;}
+    .sync-chip{font-size:.76rem;padding:4px 12px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);white-space:nowrap;}
+    .sync-chip.live{color:var(--green);border-color:rgba(72,199,142,.4);}
+    .sync-chip.error{color:var(--red);border-color:rgba(239,68,68,.4);}
+    .btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:.84rem;font-weight:600;transition:opacity .15s;}
+    .btn:hover{opacity:.82;}
+    .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+    .btn-primary{background:var(--accent);color:#fff;}
+    .btn-sm{padding:5px 12px;font-size:.79rem;}
+
+    /* TABS */
+    nav{display:flex;gap:2px;padding:0 28px;background:var(--surface);border-bottom:1px solid var(--border);}
+    .tab{padding:12px 18px;cursor:pointer;font-size:.86rem;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+    .tab.active{color:var(--text);border-bottom-color:var(--accent);}
+    .tab:hover:not(.active){color:var(--text);}
+
+    /* CONTROLS */
+    .controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--border);}
+    .ctrl-label{font-size:.8rem;color:var(--muted);}
+    .toggle-group{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    .tog{padding:6px 16px;font-size:.82rem;font-weight:600;border:none;background:none;color:var(--muted);cursor:pointer;transition:all .15s;}
+    .tog.on{background:var(--accent);color:#fff;}
+    select,input[type=month]{padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.83rem;outline:none;cursor:pointer;}
+    select:focus,input[type=month]:focus{border-color:var(--accent);}
+    .spacer{flex:1;}
+
+    /* MAIN */
+    main{padding:24px 28px;}
+    .panel{display:none;}
+    .panel.on{display:block;}
+
+    /* KPI CARDS */
+    .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px;}
+    .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;}
+    .kpi-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;}
+    .kpi-value{font-size:1.9rem;font-weight:900;line-height:1;margin-bottom:4px;}
+    .kpi-sub{font-size:.8rem;color:var(--muted);}
+    .c-green{color:var(--green);} .c-purple{color:var(--accent);} .c-yellow{color:var(--yellow);} .c-red{color:var(--red);} .c-blue{color:var(--blue);}
+
+    /* CHART GRID */
+    .chart-row{display:grid;grid-template-columns:3fr 2fr;gap:14px;margin-bottom:22px;}
+    @media(max-width:860px){.chart-row{grid-template-columns:1fr;}}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+    .card-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:16px;}
+
+    /* TABLE */
+    .table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:22px;}
+    .table-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);}
+    .table-head h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+    table{width:100%;border-collapse:collapse;}
+    thead th{padding:10px 16px;text-align:left;font-size:.76rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);}
+    tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+    tbody tr:last-child{border-bottom:none;}
+    tbody tr:hover{background:var(--surface2);}
+    tbody td{padding:12px 16px;font-size:.88rem;}
+    .pill{display:inline-flex;align-items:center;justify-content:center;padding:3px 11px;border-radius:20px;font-weight:700;font-size:.82rem;min-width:50px;}
+    .pill-green{background:rgba(72,199,142,.15);color:var(--green);}
+    .pill-yellow{background:rgba(245,158,11,.15);color:var(--yellow);}
+    .pill-red{background:rgba(239,68,68,.15);color:var(--red);}
+    .pill-blue{background:rgba(56,189,248,.15);color:var(--blue);}
+
+    /* AGENT CHIP */
+    .agent-chip{display:flex;align-items:center;gap:10px;}
+    .av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.76rem;color:#fff;flex-shrink:0;}
+
+    /* RANK */
+    .rank{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:.75rem;font-weight:800;}
+    .r1{background:#f59e0b;color:#000;}.r2{background:#9ca3af;color:#000;}.r3{background:#b45309;color:#fff;}.rn{background:var(--surface2);color:var(--muted);}
+
+    /* MINI BAR */
+    .mbar{display:flex;align-items:center;gap:8px;}
+    .mbar-track{flex:1;height:5px;background:var(--border);border-radius:3px;min-width:60px;}
+    .mbar-fill{height:100%;border-radius:3px;transition:width .4s;}
+
+    /* AGENT HERO */
+    .hero{background:linear-gradient(135deg,#1a1d27 0%,#221a44 100%);border:1px solid var(--border);border-radius:var(--radius);padding:26px 28px;margin-bottom:20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+    .hero-av{width:70px;height:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.5rem;color:#fff;flex-shrink:0;}
+    .hero-info h2{font-size:1.3rem;font-weight:800;}
+    .hero-info p{color:var(--muted);font-size:.87rem;margin-top:3px;}
+    .hero-score{margin-left:auto;text-align:center;}
+    .hero-score .big{font-size:2.8rem;font-weight:900;line-height:1;}
+    .hero-score small{color:var(--muted);font-size:.78rem;}
+
+    /* CATEGORY CARDS */
+    .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+    .cat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+    .cat-label{font-size:.73rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:8px;}
+    .cat-score{font-size:1.5rem;font-weight:800;}
+    .cat-sub{font-size:.73rem;color:var(--muted);margin-top:3px;}
+    .cat-bar{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;}
+    .cat-bar-fill{height:100%;border-radius:2px;}
+
+    /* ADMIN */
+    .admin-wrap{max-width:800px;}
+    .admin-wrap h3{font-size:1rem;margin-bottom:6px;}
+    .admin-wrap > p{color:var(--muted);font-size:.87rem;margin-bottom:22px;}
+    .link-code{font-family:monospace;font-size:.79rem;background:var(--surface2);padding:3px 8px;border-radius:4px;color:var(--muted);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;}
+
+    /* SETUP BANNER */
+    .banner{background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.3);border-radius:var(--radius);padding:18px 22px;display:flex;align-items:center;gap:16px;margin-bottom:22px;}
+    .banner p{font-size:.88rem;flex:1;}
+    .banner strong{color:var(--accent);}
+
+    /* LOADING */
+    .loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:14px;color:var(--muted);}
+    .spin{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .65s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+
+    /* LINK */
+    a{color:var(--blue);text-decoration:none;}
+    a:hover{text-decoration:underline;}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">PS</div>
+    <div>
+      <div class="logo-name" id="hdr-title">Path Social – QA Dashboard</div>
+      <div class="logo-sub" id="hdr-sub">Team View</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="sync-chip" id="sync-chip">⏳ Loading data…</div>
+    <button class="btn btn-ghost btn-sm" onclick="loadData()">↻ Refresh</button>
+    <button class="btn btn-ghost btn-sm" onclick="openSetup()">⚙ Setup</button>
+  </div>
+</header>
+
+<nav id="main-nav">
+  <div class="tab active" data-tab="team" onclick="goTab('team')">📊 Team Dashboard</div>
+  <div class="tab" data-tab="agent" onclick="goTab('agent')" id="nav-agent">👤 My Performance</div>
+  <div class="tab" data-tab="admin" onclick="goTab('admin')" id="nav-admin">🔗 Admin &amp; Links</div>
+</nav>
+
+<div class="controls">
+  <span class="ctrl-label">Period</span>
+  <div class="toggle-group">
+    <button class="tog on" id="tog-mtd" onclick="setPeriod('mtd')">Month to Date</button>
+    <button class="tog" id="tog-full" onclick="setPeriod('full')">Full Month</button>
+  </div>
+  <span class="ctrl-label">Month</span>
+  <input type="month" id="month-pick" onchange="onMonthChange()"/>
+  <div class="spacer"></div>
+  <select id="agent-sel" style="display:none" onchange="onAgentSel()">
+    <option value="">— Select Agent —</option>
+  </select>
+</div>
+
+<main>
+
+  <!-- TEAM PANEL -->
+  <div class="panel on" id="panel-team">
+    <div id="team-loader" class="loader" style="display:none;"><div class="spin"></div><span>Fetching QA data…</span></div>
+    <div id="team-banner" class="banner" style="display:none;">
+      <span>⚠️</span>
+      <p>Could not load sheet data. Make sure the sheet is shared as <strong>"Anyone with the link can view"</strong>, then click Refresh. Or click Setup to update the Sheet ID.</p>
+      <button class="btn btn-primary btn-sm" onclick="openSetup()">Setup</button>
+    </div>
+    <div id="team-content" style="display:none;">
+      <div class="kpi-row" id="kpi-row"></div>
+      <div class="chart-row">
+        <div class="card"><div class="card-title">Agent Average Scores</div><canvas id="ch-bar" height="200"></canvas></div>
+        <div class="card"><div class="card-title">Score Distribution</div><canvas id="ch-donut" height="200"></canvas></div>
+      </div>
+      <div class="table-card">
+        <div class="table-head"><h3>Leaderboard</h3><span id="period-badge" style="font-size:.78rem;color:var(--muted);"></span></div>
+        <table><thead><tr id="lb-head"></tr></thead><tbody id="lb-body"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGENT PANEL -->
+  <div class="panel" id="panel-agent">
+    <div id="agent-empty" class="loader" style="display:none;"><span style="font-size:2rem;">👤</span><span>Select an agent above or open your personal link.</span></div>
+    <div id="agent-noreview" class="loader" style="display:none;"><span style="font-size:2rem;">🔍</span><span>No reviews found for this period.</span></div>
+    <div id="agent-content" style="display:none;">
+      <div class="hero" id="agent-hero"></div>
+      <div class="cat-grid" id="agent-cats"></div>
+      <div class="chart-row">
+        <div class="card"><div class="card-title">Score Trend</div><canvas id="ch-trend" height="200"></canvas></div>
+        <div class="card"><div class="card-title">Category Pass Rates</div><canvas id="ch-catbar" height="200"></canvas></div>
+      </div>
+      <div class="table-card">
+        <div class="table-head"><h3>Review History</h3></div>
+        <table>
+          <thead><tr><th>Date</th><th>Score</th><th>Reviewer</th><th>Remarks</th><th>Conversation</th></tr></thead>
+          <tbody id="review-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div class="panel" id="panel-admin">
+    <div class="admin-wrap">
+      <h3>🔗 Per-Agent Access Links</h3>
+      <p>Copy and share these links with each agent. They open directly to their personal QA view — no login needed.</p>
+      <div class="table-card">
+        <div class="table-head"><h3>Agent Links</h3></div>
+        <table>
+          <thead><tr><th>Agent</th><th>Personal Link</th><th></th></tr></thead>
+          <tbody id="admin-body"></tbody>
+        </table>
+      </div>
+      <div class="card" style="font-size:.83rem;color:var(--muted);line-height:1.6;">
+        <strong style="color:var(--text);">ℹ️ How it works</strong><br/>
+        Each link opens the dashboard filtered to that agent's data only. Agents see their own scores, category breakdowns, score trend, and review history — but cannot see other agents' data.<br/><br/>
+        <strong style="color:var(--text);">🔒 Sheet sharing required</strong><br/>
+        For agents to load data, your Google Sheet must be set to <strong style="color:var(--accent);">"Anyone with the link can view"</strong>. Go to your sheet → Share → Change to Anyone with the link → Viewer.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- SETUP MODAL -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;width:460px;max-width:95vw;">
+    <h2 style="margin-bottom:8px;">⚙️ Sheet Configuration</h2>
+    <p style="color:var(--muted);font-size:.87rem;margin-bottom:24px;">The sheet ID and GID are pre-filled for Path Social's QA sheet. Only change these if the sheet moves.</p>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:.82rem;color:var(--muted);margin-bottom:5px;">Google Sheet ID</label>
+      <input id="cfg-id" type="text" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none;"/>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:.82rem;color:var(--muted);margin-bottom:5px;">Sheet Tab GID (Scores tab)</label>
+      <input id="cfg-gid" type="text" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none;"/>
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="display:block;font-size:.82rem;color:var(--muted);margin-bottom:5px;">Dashboard URL (for generating agent links)</label>
+      <input id="cfg-url" type="text" style="width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none;"/>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-primary" onclick="saveSetup()">Save & Reload</button>
+      <button class="btn btn-ghost" onclick="closeSetup()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════
+
+const DEFAULT_SHEET_ID = '1UNFAPo0wowxJKoygppVuJRPNEzW7G4qFnnbwztRnmV8';
+const DEFAULT_GID      = '1994767311';
+const MIN_YEAR         = 2026;
+
+const ALLOWED_AGENTS   = ['Roynalyn Malcampo', 'Geal Ann Lorico', 'Jessica Ibañez'];
+
+// Column indices in the CSV (0-based, after header)
+const COL = {
+  TIMESTAMP : 0,
+  AGENT     : 1,
+  LINK      : 2,
+  REVIEWER  : 3,
+  SCORE     : 4,
+  REMARKS   : 5,
+};
+
+// Category columns with display names and group labels
+const CATS = [
+  { col:6,  short:'Acknowledgment',   group:'Soft Skills' },
+  { col:7,  short:'Reassurance',      group:'Soft Skills' },
+  { col:8,  short:'Empathy',          group:'Soft Skills' },
+  { col:9,  short:'Topic Application',group:'Policy' },
+  { col:10, short:'Account Review',   group:'Policy' },
+  { col:11, short:'SOP Adherence',    group:'Policy' },
+  { col:12, short:'Escalation',       group:'Policy' },
+  { col:13, short:'Brand Voice',      group:'Policy' },
+  { col:14, short:'Tracker Updates',  group:'Policy' },
+  { col:15, short:'Notes Recorded',   group:'Policy' },
+];
+
+// Agent avatar colors
+const AV_COLORS = {
+  'Roynalyn Malcampo': '#6c63ff',
+  'Geal Ann Lorico'  : '#48c78e',
+  'Jessica Ibañez'   : '#f59e0b',
+};
+
+function avColor(name){ return AV_COLORS[name] || '#8892a4'; }
+function initials(name){ return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+
+// ══════════════════════════════════════════════
+//  CONFIG (localStorage)
+// ══════════════════════════════════════════════
+
+function cfg(){
+  try{ return JSON.parse(localStorage.getItem('ps_qa_cfg'))||{}; }catch{ return {}; }
+}
+function saveCfg(o){ localStorage.setItem('ps_qa_cfg', JSON.stringify(o)); }
+
+function sheetId(){ return cfg().sheetId || DEFAULT_SHEET_ID; }
+function sheetGid(){ return cfg().gid    || DEFAULT_GID; }
+function siteUrl(){ return (cfg().siteUrl || window.location.origin + window.location.pathname).replace(/\/$/,'') + '/'; }
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+
+let allRows = [];       // parsed + filtered rows
+let period  = 'mtd';   // 'mtd' | 'full'
+let selMonth = '';
+let activeAgent = '';   // '' = none selected
+let charts = {};
+
+// ══════════════════════════════════════════════
+//  CSV PARSING
+// ══════════════════════════════════════════════
+
+function parseCSV(text){
+  const lines = text.replace(/\r/g,'').split('\n');
+  // Find first data row (starts with date pattern)
+  const datePat = /^\d{1,2}\/\d{1,2}\/\d{4}/;
+  let dataStart = 1;
+  for(let i=0;i<lines.length;i++){
+    if(datePat.test(lines[i].replace(/^"/,''))){ dataStart = i; break; }
+  }
+  const rows = [];
+  for(let i = dataStart; i < lines.length; i++){
+    const l = lines[i].trim();
+    if(!l) continue;
+    rows.push(parseRow(l));
+  }
+  return rows;
+}
+
+function parseRow(line){
+  const r=[];let q=false,c='';
+  for(let i=0;i<line.length;i++){
+    if(line[i]==='"'){q=!q;}
+    else if(line[i]===',' && !q){r.push(c);c='';}
+    else{c+=line[i];}
+  }
+  r.push(c);
+  return r;
+}
+
+function parseTs(ts){
+  // Format: "M/D/YYYY H:MM:SS" or "M/D/YYYY"
+  if(!ts) return null;
+  const d = new Date(ts);
+  return isNaN(d) ? null : d;
+}
+
+// ══════════════════════════════════════════════
+//  DATA FETCH
+// ══════════════════════════════════════════════
+
+async function loadData(){
+  setSync('','⏳ Loading…');
+  showTeamState('loading');
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId()}/export?format=csv&gid=${sheetGid()}`;
+  try{
+    const res = await fetch(url, {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    const raw = parseCSV(text);
+    // Filter: year >= MIN_YEAR, agent in ALLOWED_AGENTS
+    allRows = raw.filter(r=>{
+      const ts = parseTs(r[COL.TIMESTAMP]);
+      if(!ts || ts.getFullYear() < MIN_YEAR) return false;
+      const agent = (r[COL.AGENT]||'').trim();
+      return ALLOWED_AGENTS.some(a => a.toLowerCase() === agent.toLowerCase());
+    });
+    setSync('live',`✅ Live – ${allRows.length} reviews`);
+    showTeamState('content');
+    populateAgentSel();
+    renderAll();
+  }catch(e){
+    console.error(e);
+    setSync('error','⚠️ Load failed');
+    showTeamState('banner');
+  }
+}
+
+// ══════════════════════════════════════════════
+//  PERIOD FILTER
+// ══════════════════════════════════════════════
+
+function filteredRows(agentFilter){
+  const [y,m] = selMonth.split('-').map(Number);
+  const start = new Date(y, m-1, 1);
+  const end   = period==='mtd'
+    ? new Date()  // today
+    : new Date(y, m, 0, 23, 59, 59);  // last day of month
+
+  return allRows.filter(r=>{
+    const ts = parseTs(r[COL.TIMESTAMP]);
+    if(!ts) return false;
+    if(ts < start || ts > end) return false;
+    if(agentFilter){
+      const agent = (r[COL.AGENT]||'').trim();
+      return agent.toLowerCase() === agentFilter.toLowerCase();
+    }
+    return true;
+  });
+}
+
+function agentStats(rows){
+  const map = {};
+  rows.forEach(r=>{
+    const name = (r[COL.AGENT]||'').trim();
+    if(!name) return;
+    if(!map[name]) map[name] = {name, scores:[], cats:{}, total:0};
+    const sc = parseFloat(r[COL.SCORE]);
+    if(!isNaN(sc)) map[name].scores.push(sc);
+    map[name].total++;
+    CATS.forEach(c=>{
+      const v = (r[c.col]||'').trim().toLowerCase();
+      if(!map[name].cats[c.col]) map[name].cats[c.col] = {yes:0,no:0,na:0};
+      if(v==='yes') map[name].cats[c.col].yes++;
+      else if(v==='no') map[name].cats[c.col].no++;
+      else map[name].cats[c.col].na++;
+    });
+  });
+  return Object.values(map).map(a=>{
+    const avg = a.scores.length ? a.scores.reduce((s,x)=>s+x,0)/a.scores.length : null;
+    const catRates = {};
+    CATS.forEach(c=>{
+      const d = a.cats[c.col]||{yes:0,no:0,na:0};
+      const tot = d.yes+d.no;
+      catRates[c.col] = tot>0 ? Math.round(d.yes/tot*100) : null;
+    });
+    return {...a, avg:avg?parseFloat(avg.toFixed(1)):null, catRates};
+  }).sort((a,b)=>(b.avg||0)-(a.avg||0));
+}
+
+// ══════════════════════════════════════════════
+//  RENDER ALL
+// ══════════════════════════════════════════════
+
+function renderAll(){
+  const rows = filteredRows('');
+  const stats = agentStats(rows);
+  renderKPIs(stats, rows);
+  renderLeaderboard(stats);
+  renderBarChart(stats);
+  renderDonutChart(stats);
+  updatePeriodBadge();
+  if(document.getElementById('panel-agent').classList.contains('on')){
+    renderAgentPanel(activeAgent);
+  }
+  if(document.getElementById('panel-admin').classList.contains('on')){
+    renderAdmin();
+  }
+}
+
+// ── KPI CARDS ──
+function renderKPIs(stats, rows){
+  const el = document.getElementById('kpi-row');
+  if(!stats.length){el.innerHTML='';return;}
+  const scores = stats.map(s=>s.avg).filter(n=>n!==null);
+  const teamAvg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : 'N/A';
+  const top = stats[0];
+  const bot = stats[stats.length-1];
+  const passing = stats.filter(s=>s.avg!==null && s.avg>=90).length;
+  el.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Team Avg Score</div><div class="kpi-value c-purple">${teamAvg}%</div><div class="kpi-sub">${stats.length} agents</div></div>
+    <div class="kpi"><div class="kpi-label">Total Reviews</div><div class="kpi-value c-blue">${rows.length}</div><div class="kpi-sub">This period</div></div>
+    <div class="kpi"><div class="kpi-label">Top Performer</div><div class="kpi-value c-green" style="font-size:1.3rem;">${top.name.split(' ')[0]}</div><div class="kpi-sub">${top.avg}% avg · ${top.total} reviews</div></div>
+    <div class="kpi"><div class="kpi-label">Agents ≥ 90%</div><div class="kpi-value ${passing===stats.length?'c-green':'c-yellow'}">${passing}/${stats.length}</div><div class="kpi-sub">Meeting target</div></div>
+  `;
+}
+
+// ── LEADERBOARD ──
+function renderLeaderboard(stats){
+  const head = document.getElementById('lb-head');
+  const body = document.getElementById('lb-body');
+  const catCols = CATS.slice(0,5); // show first 5 cats in table
+  head.innerHTML = `<th>#</th><th>Agent</th><th>Avg Score</th><th>Reviews</th>${catCols.map(c=>`<th>${c.short}</th>`).join('')}`;
+  body.innerHTML = stats.map((s,i)=>{
+    const rc = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+    const sc = s.avg;
+    const pill = sc===null?'—':`<span class="pill ${pillClass(sc)}">${sc}%</span>`;
+    const catCells = catCols.map(c=>{
+      const v = s.catRates[c.col];
+      return `<td>${v===null?'—':`<div class="mbar"><div class="mbar-track"><div class="mbar-fill" style="width:${v}%;background:${barColor(v)};"></div></div><span style="font-size:.79rem;color:var(--muted);min-width:32px;">${v}%</span></div>`}</td>`;
+    }).join('');
+    return `<tr>
+      <td><span class="rank ${rc}">${i+1}</span></td>
+      <td><div class="agent-chip"><div class="av" style="background:${avColor(s.name)}">${initials(s.name)}</div>${s.name}</div></td>
+      <td>${pill}</td><td>${s.total}</td>${catCells}
+    </tr>`;
+  }).join('');
+}
+
+// ── BAR CHART ──
+function renderBarChart(stats){
+  if(charts.bar) charts.bar.destroy();
+  const labels = stats.map(s=>s.name.split(' ')[0]);
+  const data   = stats.map(s=>s.avg||0);
+  const colors = data.map(v=>v>=90?'rgba(72,199,142,.8)':v>=75?'rgba(245,158,11,.8)':'rgba(239,68,68,.8)');
+  charts.bar = new Chart(document.getElementById('ch-bar'),{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:colors,borderRadius:6}]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{y:{min:0,max:100,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4',callback:v=>v+'%'}},
+              x:{grid:{display:false},ticks:{color:'#8892a4'}}}}
+  });
+}
+
+// ── DONUT CHART ──
+function renderDonutChart(stats){
+  if(charts.donut) charts.donut.destroy();
+  const scores = stats.map(s=>s.avg).filter(n=>n!==null);
+  const h=scores.filter(s=>s>=90).length, m=scores.filter(s=>s>=75&&s<90).length, l=scores.filter(s=>s<75).length;
+  charts.donut = new Chart(document.getElementById('ch-donut'),{
+    type:'doughnut',
+    data:{labels:['≥90% High','75-89% Mid','<75% Low'],
+          datasets:[{data:[h,m,l],backgroundColor:['rgba(72,199,142,.8)','rgba(245,158,11,.8)','rgba(239,68,68,.8)'],borderWidth:0}]},
+    options:{responsive:true,cutout:'66%',plugins:{legend:{position:'bottom',labels:{color:'#8892a4',padding:14,font:{size:12}}}}}
+  });
+}
+
+// ══════════════════════════════════════════════
+//  AGENT PANEL
+// ══════════════════════════════════════════════
+
+function renderAgentPanel(agentName){
+  const show = (id,on)=>document.getElementById(id).style.display=on?'block':'none';
+  show('agent-empty',false); show('agent-noreview',false); show('agent-content',false);
+
+  if(!agentName){
+    show('agent-empty',true);
+    document.getElementById('agent-empty').style.display='flex';
+    return;
+  }
+
+  const rows = filteredRows(agentName);
+  if(!rows.length){
+    document.getElementById('agent-noreview').style.display='flex';
+    return;
+  }
+
+  const stats = agentStats(rows);
+  const s = stats.find(x=>x.name.toLowerCase()===agentName.toLowerCase()) || stats[0];
+  const sc = s.avg;
+  const color = sc>=90?'var(--green)':sc>=75?'var(--yellow)':'var(--red)';
+
+  // Hero
+  document.getElementById('agent-hero').innerHTML = `
+    <div class="hero-av" style="background:${avColor(s.name)}">${initials(s.name)}</div>
+    <div class="hero-info">
+      <h2>${s.name}</h2>
+      <p>${s.total} reviews · ${periodLabel()}</p>
+    </div>
+    <div class="hero-score">
+      <div class="big" style="color:${color}">${sc!==null?sc+'%':'N/A'}</div>
+      <small>Overall Avg</small>
+    </div>
+  `;
+
+  // Category cards
+  const catEl = document.getElementById('agent-cats');
+  catEl.innerHTML = CATS.map(c=>{
+    const v = s.catRates[c.col];
+    const col = v>=90?'var(--green)':v>=75?'var(--yellow)':'var(--red)';
+    const barCol = v>=90?'#48c78e':v>=75?'#f59e0b':'#ef4444';
+    return `<div class="cat-card">
+      <div class="cat-label">${c.short}</div>
+      <div class="cat-score" style="color:${v!==null?col:'var(--muted)'}">${v!==null?v+'%':'N/A'}</div>
+      <div class="cat-sub">${c.group}</div>
+      <div class="cat-bar"><div class="cat-bar-fill" style="width:${v||0}%;background:${barCol};"></div></div>
+    </div>`;
+  }).join('');
+
+  // Trend chart
+  const sorted = [...rows].sort((a,b)=>new Date(a[COL.TIMESTAMP])-new Date(b[COL.TIMESTAMP]));
+  const tlabels = sorted.map(r=>{const d=parseTs(r[COL.TIMESTAMP]);return d?`${d.getMonth()+1}/${d.getDate()}`:''});
+  const tdata   = sorted.map(r=>parseFloat(r[COL.SCORE])||null);
+  if(charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(document.getElementById('ch-trend'),{
+    type:'line',
+    data:{labels:tlabels,datasets:[{data:tdata,borderColor:'#6c63ff',backgroundColor:'rgba(108,99,255,.1)',fill:true,tension:.35,pointRadius:3,pointBackgroundColor:'#6c63ff'}]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{y:{min:0,max:100,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4',callback:v=>v+'%'}},
+              x:{grid:{display:false},ticks:{color:'#8892a4',maxTicksLimit:8}}}}
+  });
+
+  // Category bar chart
+  if(charts.catbar) charts.catbar.destroy();
+  const catLabels = CATS.map(c=>c.short);
+  const catData   = CATS.map(c=>s.catRates[c.col]||0);
+  const catColors = catData.map(v=>v>=90?'rgba(72,199,142,.7)':v>=75?'rgba(245,158,11,.7)':'rgba(239,68,68,.7)');
+  charts.catbar = new Chart(document.getElementById('ch-catbar'),{
+    type:'bar',
+    data:{labels:catLabels,datasets:[{data:catData,backgroundColor:catColors,borderRadius:5}]},
+    options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},
+      scales:{x:{min:0,max:100,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8892a4',callback:v=>v+'%'}},
+              y:{grid:{display:false},ticks:{color:'#8892a4',font:{size:11}}}}}
+  });
+
+  // Review history
+  const body = document.getElementById('review-body');
+  body.innerHTML = [...sorted].reverse().map(r=>{
+    const sc2 = parseFloat(r[COL.SCORE]);
+    const cls  = pillClass(sc2);
+    const d    = parseTs(r[COL.TIMESTAMP]);
+    const dateStr = d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : r[COL.TIMESTAMP];
+    const link = r[COL.LINK]?`<a href="${r[COL.LINK]}" target="_blank" rel="noopener">View ↗</a>`:'—';
+    const rem  = r[COL.REMARKS]||'';
+    return `<tr>
+      <td>${dateStr}</td>
+      <td><span class="pill ${cls}">${isNaN(sc2)?'—':sc2+'%'}</span></td>
+      <td>${r[COL.REVIEWER]||'—'}</td>
+      <td style="color:var(--muted);font-size:.82rem;max-width:300px;">${rem.slice(0,120)}${rem.length>120?'…':''}</td>
+      <td>${link}</td>
+    </tr>`;
+  }).join('');
+
+  show('agent-content',true);
+}
+
+// ══════════════════════════════════════════════
+//  ADMIN PANEL
+// ══════════════════════════════════════════════
+
+function renderAdmin(){
+  const base = siteUrl();
+  document.getElementById('admin-body').innerHTML = ALLOWED_AGENTS.map(name=>{
+    const link = `${base}?agent=${encodeURIComponent(name)}`;
+    const color = avColor(name);
+    return `<tr>
+      <td><div class="agent-chip"><div class="av" style="background:${color}">${initials(name)}</div>${name}</div></td>
+      <td><span class="link-code" title="${link}">${link}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="copyLink('${link}',this)">Copy</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function copyLink(link, btn){
+  navigator.clipboard.writeText(link).then(()=>{btn.textContent='✅ Copied!';setTimeout(()=>btn.textContent='Copy',2000);});
+}
+
+// ══════════════════════════════════════════════
+//  TAB SWITCHING
+// ══════════════════════════════════════════════
+
+function goTab(t){
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.tab===t));
+  document.querySelectorAll('.panel').forEach(el=>el.classList.toggle('on',el.id===`panel-${t}`));
+  document.getElementById('agent-sel').style.display = t==='agent'?'block':'none';
+  if(t==='agent') renderAgentPanel(activeAgent);
+  if(t==='admin') renderAdmin();
+}
+
+// ══════════════════════════════════════════════
+//  PERIOD / MONTH CONTROLS
+// ══════════════════════════════════════════════
+
+function setPeriod(p){
+  period = p;
+  document.getElementById('tog-mtd').classList.toggle('on',p==='mtd');
+  document.getElementById('tog-full').classList.toggle('on',p==='full');
+  renderAll();
+}
+
+function onMonthChange(){
+  selMonth = document.getElementById('month-pick').value;
+  renderAll();
+}
+
+function initMonth(){
+  const now = new Date();
+  selMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('month-pick').value = selMonth;
+}
+
+function periodLabel(){
+  const [y,m] = selMonth.split('-').map(Number);
+  const monthName = new Date(y,m-1).toLocaleString('en-US',{month:'long',year:'numeric'});
+  return period==='mtd' ? `MTD · ${monthName}` : `Full Month · ${monthName}`;
+}
+
+function updatePeriodBadge(){
+  document.getElementById('period-badge').textContent = periodLabel();
+}
+
+// ══════════════════════════════════════════════
+//  AGENT SELECT
+// ══════════════════════════════════════════════
+
+function populateAgentSel(){
+  const sel = document.getElementById('agent-sel');
+  sel.innerHTML = '<option value="">— Select Agent —</option>' +
+    ALLOWED_AGENTS.map(n=>`<option value="${n}">${n}</option>`).join('');
+  if(activeAgent) sel.value = activeAgent;
+}
+
+function onAgentSel(){
+  activeAgent = document.getElementById('agent-sel').value;
+  renderAgentPanel(activeAgent);
+}
+
+// ══════════════════════════════════════════════
+//  URL PARAMS — AGENT DEEP LINK
+// ══════════════════════════════════════════════
+
+function checkUrl(){
+  const p = new URLSearchParams(window.location.search);
+  const agent = p.get('agent');
+  if(agent){
+    // Find canonical agent name (case-insensitive)
+    const match = ALLOWED_AGENTS.find(a=>a.toLowerCase()===decodeURIComponent(agent).toLowerCase());
+    activeAgent = match || decodeURIComponent(agent);
+    document.getElementById('hdr-sub').textContent = `Viewing: ${activeAgent}`;
+    // Switch to agent tab
+    setTimeout(()=>{
+      goTab('agent');
+      document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.tab==='agent'));
+    },100);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  SETUP MODAL
+// ══════════════════════════════════════════════
+
+function openSetup(){
+  const c = cfg();
+  document.getElementById('cfg-id').value  = c.sheetId  || DEFAULT_SHEET_ID;
+  document.getElementById('cfg-gid').value = c.gid      || DEFAULT_GID;
+  document.getElementById('cfg-url').value = c.siteUrl  || siteUrl();
+  document.getElementById('modal').style.display='flex';
+}
+function closeSetup(){ document.getElementById('modal').style.display='none'; }
+function saveSetup(){
+  saveCfg({
+    sheetId : document.getElementById('cfg-id').value.trim()  || DEFAULT_SHEET_ID,
+    gid     : document.getElementById('cfg-gid').value.trim() || DEFAULT_GID,
+    siteUrl : document.getElementById('cfg-url').value.trim(),
+  });
+  closeSetup();
+  loadData();
+}
+
+// ══════════════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════════════
+
+function setSync(cls,txt){
+  const el=document.getElementById('sync-chip');
+  el.className='sync-chip'+(cls?' '+cls:'');
+  el.textContent=txt;
+}
+
+function showTeamState(state){
+  document.getElementById('team-loader').style.display  = state==='loading'?'flex':'none';
+  document.getElementById('team-banner').style.display  = state==='banner' ?'flex':'none';
+  document.getElementById('team-content').style.display = state==='content'?'block':'none';
+}
+
+function pillClass(v){
+  if(isNaN(v)) return '';
+  return v>=90?'pill-green':v>=75?'pill-yellow':'pill-red';
+}
+function barColor(v){
+  return v>=90?'#48c78e':v>=75?'#f59e0b':'#ef4444';
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded',()=>{
+  initMonth();
+  checkUrl();
+  loadData();
+});
+</script>
+</body>
+</html>
