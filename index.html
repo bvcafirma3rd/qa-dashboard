@@ -39,6 +39,8 @@
     /* CONTROLS */
     .controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--border);}
     .ctrl-label{font-size:.8rem;color:var(--muted);}
+    .month-label{cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);transition:all .15s;user-select:none;}
+    .month-label:hover{color:var(--text);border-color:var(--accent);}
     .toggle-group{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
     .tog{padding:6px 16px;font-size:.82rem;font-weight:600;border:none;background:none;color:var(--muted);cursor:pointer;transition:all .15s;}
     .tog.on{background:var(--accent);color:#fff;}
@@ -162,7 +164,7 @@
     <button class="tog on" id="tog-mtd" onclick="setPeriod('mtd')">Month to Date</button>
     <button class="tog" id="tog-full" onclick="setPeriod('full')">Full Month</button>
   </div>
-  <span class="ctrl-label">Month</span>
+  <label for="month-pick" class="ctrl-label month-label" title="Click to change month">Month</label>
   <input type="month" id="month-pick" onchange="onMonthChange()"/>
   <div class="spacer"></div>
   <select id="agent-sel" style="display:none" onchange="onAgentSel()">
