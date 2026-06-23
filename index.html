@@ -133,6 +133,24 @@
     a{color:var(--blue);text-decoration:none;}
     a:hover{text-decoration:underline;}
 
+    /* MARKDOWN TRACKER */
+    .tracker-wrap{overflow-x:auto;}
+    .tracker-table{width:100%;border-collapse:collapse;font-size:.82rem;}
+    .tracker-table th{padding:8px 12px;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#fff;background:var(--surface2);border:1px solid var(--border);white-space:nowrap;}
+    .tracker-table th.th-agent{text-align:left;min-width:160px;background:#2d3154;}
+    .tracker-table th.th-group-soft{background:#3b4b6b;color:#93c5fd;}
+    .tracker-table th.th-group-policy{background:#2d4a3e;color:#86efac;}
+    .tracker-table th.th-total{background:#4a2d4a;color:#d8b4fe;min-width:60px;}
+    .tracker-table td{padding:8px 12px;text-align:center;border:1px solid var(--border);font-weight:700;font-size:.87rem;}
+    .tracker-table td.td-agent{text-align:left;font-weight:600;background:var(--surface2);}
+    .tracker-table td.td-agent .agent-chip{gap:8px;}
+    .tracker-table tr.tr-total td{font-weight:800;background:var(--surface2);border-top:2px solid var(--border);}
+    .mk-0{background:rgba(72,199,142,.15);color:var(--green);}
+    .mk-1{background:rgba(245,158,11,.12);color:var(--yellow);}
+    .mk-2{background:rgba(245,158,11,.22);color:#e08a00;}
+    .mk-3{background:rgba(239,68,68,.15);color:var(--red);}
+    .mk-hi{background:rgba(239,68,68,.28);color:#ff2222;}
+
     /* DETAILED REVIEW LIST */
     .detail-agent-block{border-bottom:1px solid var(--border);}
     .detail-agent-block:last-child{border-bottom:none;}
@@ -207,6 +225,15 @@
         <div class="table-head"><h3>Leaderboard</h3><span id="period-badge" style="font-size:.78rem;color:var(--muted);"></span></div>
         <table><thead><tr id="lb-head"></tr></thead><tbody id="lb-body"></tbody></table>
       </div>
+      <!-- MARKDOWN TRACKER -->
+      <div class="table-card" id="tracker-section" style="margin-top:14px;">
+        <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('tracker')">
+          <h3 class="section-toggle" id="tracker-toggle">Markdown Tracker — Parameter Failures</h3>
+          <span style="font-size:.78rem;color:var(--muted);">Count of "No" per category · click to collapse</span>
+        </div>
+        <div id="tracker-body" class="tracker-wrap"></div>
+      </div>
+
       <!-- DETAILED REVIEW LIST — TEAM -->
       <div class="table-card" id="team-detail-section" style="margin-top:14px;">
         <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('team')">
@@ -480,7 +507,7 @@ function agentStats(rows){
       const tot = d.yes+d.no;
       catRates[c.col] = tot>0 ? Math.round(d.yes/tot*100) : null;
     });
-    return {...a, avg:avg?parseFloat(avg.toFixed(1)):null, catRates};
+    return {...a, avg:avg?parseFloat(avg.toFixed(1)):null, catRates, rawCats:a.cats};
   }).sort((a,b)=>(b.avg||0)-(a.avg||0));
 }
 
@@ -495,6 +522,7 @@ function renderAll(){
   renderLeaderboard(stats);
   renderBarChart(stats);
   renderDonutChart(stats);
+  renderMarkdownTracker(stats, rows);
   renderDetailedList(rows, '', 'team-detail-body');
   updatePeriodBadge();
   if(document.getElementById('panel-agent').classList.contains('on')){
@@ -588,13 +616,90 @@ function renderDetailedList(rows, agentFilter, targetId){
     `<div style="padding:20px;color:var(--muted);text-align:center;">No reviews found for this period.</div>`;
 }
 
+// ── MARKDOWN TRACKER ──
+function renderMarkdownTracker(stats, rows){
+  const el = document.getElementById('tracker-body');
+  if(!stats.length){ el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;">No data.</div>'; return; }
+
+  // Period header
+  const [y,m] = selMonth.split('-').map(Number);
+  const monthName = new Date(y,m-1).toLocaleString('en-US',{month:'long',year:'numeric'});
+
+  // Column totals
+  const colTotals = {};
+  CATS.forEach(c=>{ colTotals[c.col]=0; });
+
+  // Build rows
+  const bodyRows = ALLOWED_AGENTS.map(name=>{
+    const s = stats.find(x=>x.name.toLowerCase()===name.toLowerCase());
+    if(!s) return `<tr>
+      <td class="td-agent"><div class="agent-chip"><div class="av" style="background:${avColor(name)};width:26px;height:26px;font-size:.65rem;">${initials(name)}</div>${name}</div></td>
+      ${CATS.map(()=>'<td class="mk-0">0</td>').join('')}
+      <td class="mk-0">0</td>
+    </tr>`;
+
+    let rowTotal = 0;
+    const cells = CATS.map(c=>{
+      const d = s.rawCats[c.col]||{no:0};
+      const n = d.no||0;
+      colTotals[c.col] += n;
+      rowTotal += n;
+      const cls = n===0?'mk-0':n===1?'mk-1':n===2?'mk-2':n<=4?'mk-3':'mk-hi';
+      return `<td class="${cls}">${n}</td>`;
+    }).join('');
+    const tCls = rowTotal===0?'mk-0':rowTotal<=3?'mk-1':rowTotal<=7?'mk-2':rowTotal<=12?'mk-3':'mk-hi';
+    return `<tr>
+      <td class="td-agent"><div class="agent-chip"><div class="av" style="background:${avColor(name)};width:26px;height:26px;font-size:.65rem;">${initials(name)}</div>${name}</div></td>
+      ${cells}
+      <td class="${tCls}" style="font-size:.9rem;">${rowTotal}</td>
+    </tr>`;
+  }).join('');
+
+  // Team totals row
+  const grandTotal = Object.values(colTotals).reduce((a,b)=>a+b,0);
+  const totalCells = CATS.map(c=>{
+    const n = colTotals[c.col];
+    const cls = n===0?'mk-0':n<=3?'mk-1':n<=6?'mk-2':n<=10?'mk-3':'mk-hi';
+    return `<td class="${cls}">${n}</td>`;
+  }).join('');
+  const gtCls = grandTotal===0?'mk-0':grandTotal<=10?'mk-1':grandTotal<=25?'mk-2':grandTotal<=40?'mk-3':'mk-hi';
+
+  el.innerHTML = `
+    <table class="tracker-table">
+      <thead>
+        <tr>
+          <th class="th-agent" rowspan="2">Agent's Name</th>
+          <th class="th-group-soft" colspan="3">Soft Skills</th>
+          <th class="th-group-policy" colspan="7">Policy Compliance</th>
+          <th class="th-total" rowspan="2">TOTAL</th>
+        </tr>
+        <tr>
+          ${CATS.map(c=>`<th class="${c.group==='Soft Skills'?'th-group-soft':'th-group-policy'}">${c.short}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${bodyRows}
+        <tr class="tr-total">
+          <td class="td-agent" style="font-weight:800;color:var(--text);">Total</td>
+          ${totalCells}
+          <td class="${gtCls}" style="font-size:.9rem;">${grandTotal}</td>
+        </tr>
+      </tbody>
+    </table>`;
+}
+
 // ── COLLAPSIBLE SECTIONS ──
 function toggleDetailSection(which){
-  const bodyId  = which==='team' ? 'team-detail-body'  : 'agent-detail-body';
-  const togId   = which==='team' ? 'team-detail-toggle' : 'agent-detail-toggle';
-  const body    = document.getElementById(bodyId);
-  const toggle  = document.getElementById(togId);
-  const hidden  = body.style.display === 'none';
+  const map = {
+    team:    {body:'team-detail-body',   tog:'team-detail-toggle'},
+    agent:   {body:'agent-detail-body',  tog:'agent-detail-toggle'},
+    tracker: {body:'tracker-body',       tog:'tracker-toggle'},
+  };
+  const {body:bodyId, tog:togId} = map[which]||{};
+  if(!bodyId) return;
+  const body   = document.getElementById(bodyId);
+  const toggle = document.getElementById(togId);
+  const hidden = body.style.display === 'none';
   body.style.display = hidden ? 'block' : 'none';
   toggle.classList.toggle('collapsed', !hidden);
 }
