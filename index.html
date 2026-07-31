@@ -242,9 +242,35 @@
       <div class="table-card" id="team-detail-section" style="margin-top:14px;">
         <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('team')">
           <h3 class="section-toggle" id="team-detail-toggle">QA Reviews — Parameter Detail</h3>
-          <span style="font-size:.78rem;color:var(--muted);">Per review · all agents · click to collapse</span>
+          <span style="font-size:.78rem;color:var(--muted);">Per review · full-time agents · click to collapse</span>
         </div>
         <div id="team-detail-body"></div>
+      </div>
+
+      <!-- PART-TIME — JESSICA IBAÑEZ -->
+      <div style="margin-top:28px;padding-top:20px;border-top:2px dashed var(--border);">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <div class="av" style="background:#f59e0b;width:42px;height:42px;font-size:.9rem;flex-shrink:0;">JI</div>
+          <div>
+            <div style="font-weight:800;font-size:1rem;">Part-Time Agent</div>
+            <div style="color:var(--muted);font-size:.83rem;">Jessica Ibañez — tracked separately from team average</div>
+          </div>
+          <div id="jessica-kpis" style="margin-left:auto;display:flex;gap:20px;align-items:center;flex-wrap:wrap;"></div>
+        </div>
+        <div class="table-card" id="jessica-tracker-section">
+          <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('jessica-tracker')">
+            <h3 class="section-toggle" id="jessica-tracker-toggle">Jessica — Markdown Tracker</h3>
+            <span style="font-size:.78rem;color:var(--muted);">Failures per category · click to collapse</span>
+          </div>
+          <div id="jessica-tracker-body" class="tracker-wrap"></div>
+        </div>
+        <div class="table-card" id="jessica-detail-section" style="margin-top:14px;">
+          <div class="table-head" style="cursor:pointer;" onclick="toggleDetailSection('jessica-detail')">
+            <h3 class="section-toggle" id="jessica-detail-toggle">Jessica — QA Reviews</h3>
+            <span style="font-size:.78rem;color:var(--muted);">Per review breakdown · click to collapse</span>
+          </div>
+          <div id="jessica-detail-body"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -343,7 +369,9 @@ const DEFAULT_SHEET_ID = '1UNFAPo0wowxJKoygppVuJRPNEzW7G4qFnnbwztRnmV8';
 const DEFAULT_GID      = '1994767311';
 const MIN_YEAR         = 2026;
 
-const ALLOWED_AGENTS   = ['Roynalyn Malcampo', 'Geal Ann Lorico', 'Jessica Ibañez'];
+const FULLTIME_AGENTS  = ['Roynalyn Malcampo', 'Geal Ann Lorico'];
+const PARTTIME_AGENTS  = ['Jessica Ibañez'];
+const ALLOWED_AGENTS   = [...FULLTIME_AGENTS, ...PARTTIME_AGENTS];
 
 // Column indices in the CSV (0-based, after header)
 const COL = {
@@ -558,13 +586,24 @@ function agentStats(rows){
 
 function renderAll(){
   const rows = filteredRows('');
-  const stats = agentStats(rows);
-  renderKPIs(stats, rows);
-  renderLeaderboard(stats);
-  renderBarChart(stats);
-  renderDonutChart(stats);
-  renderMarkdownTracker(stats, rows);
-  renderDetailedList(rows, '', 'team-detail-body');
+
+  // Full-time team (excludes Jessica)
+  const ftRows  = rows.filter(r=>FULLTIME_AGENTS.some(a=>a.toLowerCase()===(r[COL.AGENT]||'').trim().toLowerCase()));
+  const ftStats = agentStats(ftRows);
+  renderKPIs(ftStats, ftRows);
+  renderLeaderboard(ftStats);
+  renderBarChart(ftStats);
+  renderDonutChart(ftStats);
+  renderMarkdownTracker(ftStats, ftRows, 'tracker-body', null, FULLTIME_AGENTS);
+  renderDetailedList(ftRows, '', 'team-detail-body', FULLTIME_AGENTS);
+
+  // Part-time — Jessica
+  const ptRows  = rows.filter(r=>PARTTIME_AGENTS.some(a=>a.toLowerCase()===(r[COL.AGENT]||'').trim().toLowerCase()));
+  const ptStats = agentStats(ptRows);
+  renderJessicaKPIs(ptStats, ptRows);
+  renderMarkdownTracker(ptStats, ptRows, 'jessica-tracker-body', 'Jessica Ibañez', ALLOWED_AGENTS);
+  renderDetailedList(ptRows, 'Jessica Ibañez', 'jessica-detail-body', ALLOWED_AGENTS);
+
   updatePeriodBadge();
   if(document.getElementById('panel-agent').classList.contains('on')){
     renderAgentPanel(activeAgent);
@@ -577,10 +616,11 @@ function renderAll(){
 // ── DETAILED REVIEW LIST ──
 function scoreColor(v){ return v>=90?'var(--green)':v>=75?'var(--yellow)':'var(--red)'; }
 
-function renderDetailedList(rows, agentFilter, targetId){
+function renderDetailedList(rows, agentFilter, targetId, agentsList){
+  agentsList = agentsList || ALLOWED_AGENTS;
   const agents = agentFilter
-    ? ALLOWED_AGENTS.filter(a=>a.toLowerCase()===agentFilter.toLowerCase())
-    : ALLOWED_AGENTS;
+    ? agentsList.filter(a=>a.toLowerCase()===agentFilter.toLowerCase())
+    : agentsList;
 
   let html = '';
   agents.forEach(agentName=>{
@@ -653,9 +693,31 @@ function renderDetailedList(rows, agentFilter, targetId){
     `<div style="padding:20px;color:var(--muted);text-align:center;">No reviews found for this period.</div>`;
 }
 
+// ── JESSICA KPIs ──
+function renderJessicaKPIs(stats, rows){
+  const el = document.getElementById('jessica-kpis');
+  if(!el) return;
+  const s = stats.find(x=>x.name.toLowerCase()==='jessica ibañez');
+  if(!s || !rows.length){
+    el.innerHTML = `<span style="color:var(--muted);font-size:.83rem;">No reviews this period</span>`;
+    return;
+  }
+  const color = s.avg>=90?'var(--green)':s.avg>=75?'var(--yellow)':'var(--red)';
+  el.innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:1.6rem;font-weight:900;color:${color};">${s.avg}%</div>
+      <div style="font-size:.75rem;color:var(--muted);">Avg Score</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:1.6rem;font-weight:900;color:var(--blue);">${s.total}</div>
+      <div style="font-size:.75rem;color:var(--muted);">Reviews</div>
+    </div>`;
+}
+
 // ── MARKDOWN TRACKER ──
-function renderMarkdownTracker(stats, rows, targetId, agentFilter){
-  targetId = targetId || 'tracker-body';
+function renderMarkdownTracker(stats, rows, targetId, agentFilter, agentsList){
+  targetId  = targetId  || 'tracker-body';
+  agentsList = agentsList || ALLOWED_AGENTS;
   const el = document.getElementById(targetId);
   if(!el) return;
   if(!stats.length){ el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;">No data.</div>'; return; }
@@ -670,8 +732,8 @@ function renderMarkdownTracker(stats, rows, targetId, agentFilter){
 
   // Build rows
   const agentsToRender = agentFilter
-    ? ALLOWED_AGENTS.filter(a=>a.toLowerCase()===agentFilter.toLowerCase())
-    : ALLOWED_AGENTS;
+    ? agentsList.filter(a=>a.toLowerCase()===agentFilter.toLowerCase())
+    : agentsList;
   const bodyRows = agentsToRender.map(name=>{
     const s = stats.find(x=>x.name.toLowerCase()===name.toLowerCase());
     if(!s) return `<tr>
@@ -733,10 +795,12 @@ function renderMarkdownTracker(stats, rows, targetId, agentFilter){
 // ── COLLAPSIBLE SECTIONS ──
 function toggleDetailSection(which){
   const map = {
-    team:            {body:'team-detail-body',    tog:'team-detail-toggle'},
-    agent:           {body:'agent-detail-body',   tog:'agent-detail-toggle'},
-    tracker:         {body:'tracker-body',         tog:'tracker-toggle'},
-    'agent-tracker': {body:'agent-tracker-body',  tog:'agent-tracker-toggle'},
+    team:             {body:'team-detail-body',    tog:'team-detail-toggle'},
+    agent:            {body:'agent-detail-body',   tog:'agent-detail-toggle'},
+    tracker:          {body:'tracker-body',         tog:'tracker-toggle'},
+    'agent-tracker':  {body:'agent-tracker-body',  tog:'agent-tracker-toggle'},
+    'jessica-tracker':{body:'jessica-tracker-body',tog:'jessica-tracker-toggle'},
+    'jessica-detail': {body:'jessica-detail-body', tog:'jessica-detail-toggle'},
   };
   const {body:bodyId, tog:togId} = map[which]||{};
   if(!bodyId) return;
@@ -893,7 +957,7 @@ function renderAgentPanel(agentName){
   });
 
   // Agent markdown tracker
-  renderMarkdownTracker(agentStats(rows), rows, 'agent-tracker-body', agentName);
+  renderMarkdownTracker(agentStats(rows), rows, 'agent-tracker-body', agentName, ALLOWED_AGENTS);
 
   // Detailed parameter list for agent panel
   renderDetailedList(rows, agentName, 'agent-detail-body');
